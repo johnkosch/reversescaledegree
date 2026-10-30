@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scale Degree Identification Quiz</title>
+<style>
+  :root { color-scheme: light; --ink:#20242b; --muted:#626b78; --line:#d9dee7; --panel:#f5f7fa; --accent:#3157a4; }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:24px 16px; font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; color:var(--ink); background:#fff; }
+  main { width:min(100%,620px); margin:0 auto; }
+  h1 { font-size:clamp(1.5rem,4vw,2rem); margin:0 0 8px; text-align:center; }
+  .subtitle { text-align:center; color:var(--muted); margin:0 0 24px; }
+  .card { border:1px solid var(--line); border-radius:16px; padding:clamp(20px,5vw,32px); }
+  .prompt-label { color:var(--muted); text-align:center; font-size:.95rem; margin-bottom:8px; }
+  #prompt { font-size:clamp(1.8rem,6vw,2.6rem); line-height:1.2; font-weight:750; text-align:center; margin:0 0 24px; }
+  form { display:flex; gap:10px; }
+  input { flex:1; min-width:0; font:inherit; font-size:1.1rem; padding:13px 14px; border:1px solid #aeb7c5; border-radius:9px; }
+  input:focus { outline:3px solid #dbe6ff; border-color:var(--accent); }
+  button { font:inherit; font-weight:650; border:0; border-radius:9px; padding:12px 17px; cursor:pointer; }
+  button:focus-visible { outline:3px solid #9bb7ff; outline-offset:2px; }
+  .primary { background:var(--accent); color:#fff; }
+  .secondary { background:#e9edf4; color:var(--ink); }
+  #feedback { min-height:2.7em; margin:18px 0 4px; text-align:center; font-weight:650; }
+  #feedback.good { color:#167044; } #feedback.bad { color:#a12c2c; }
+  .degree-buttons { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; margin-top:14px; }
+  .degree-buttons button { background:#e9edf4; color:var(--ink); padding:10px 7px; font-size:.92rem; }
+  .degree-buttons button:hover { background:#dce4f2; }
+  .degree-buttons button:disabled { opacity:.55; cursor:default; }
+  @media (max-width:440px) { .degree-buttons { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+  .actions { display:flex; justify-content:center; gap:10px; margin-top:14px; flex-wrap:wrap; }
+  .stats { display:flex; justify-content:center; gap:24px; margin-top:22px; color:var(--muted); font-size:.95rem; }
+  .stats strong { color:var(--ink); }
+  .note { color:var(--muted); font-size:.88rem; line-height:1.45; margin:22px 2px 0; }
+  .voiceover-toggle { display:flex; justify-content:center; align-items:center; gap:9px; margin:0 0 18px; }
+  .voiceover-toggle input { flex:initial; width:18px; height:18px; }
+  #prompt { overflow-wrap:anywhere; }
+  @media (max-width:440px) { form { flex-direction:column; } form button { width:100%; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Scale Degree Identification Quiz</h1>
+  <p class="subtitle">Name the scale degree of the given note.</p>
+  <label class="voiceover-toggle"><input id="voiceover" type="checkbox" checked> VoiceOver (speak prompts and feedback)</label>
+  <section class="card" aria-labelledby="prompt">
+    <div class="prompt-label" id="prompt-label">Identify the scale degree:</div>
+    <p id="prompt" aria-live="polite">Loading…</p>
+    <form id="answer-form">
+      <input id="answer" type="text" autocomplete="off" autocapitalize="off" spellcheck="false"
+        aria-label="Your scale degree answer" placeholder="e.g., mediant" required>
+      <button class="primary" type="submit">Check</button>
+    </form>
+    <div class="degree-buttons" id="degree-buttons" aria-label="Choose a scale degree"></div>
+    <div id="feedback" role="status" aria-live="polite"></div>
+    <div class="actions">
+      <button class="secondary" id="next" type="button">Next prompt</button>
+      <button class="secondary" id="reset" type="button">Reset score</button>
+    </div>
+  </section>
+  <div class="stats" aria-live="polite">
+    <span>Correct: <strong id="correct">0</strong></span>
+    <span>Attempted: <strong id="attempted">0</strong></span>
+  </div>
+  <p class="note">Use the text field or choose a scale-degree button. In major keys, scale degree 7 is the leading tone; in natural minor keys, it is the subtonic.</p>
+</main>
+<script>
+(() => {
+  const keys = [
+    {name:"C major", tonic:"C", mode:"major"},
+    {name:"G major", tonic:"G", mode:"major"},
+    {name:"D major", tonic:"D", mode:"major"},
+    {name:"A major", tonic:"A", mode:"major"},
+    {name:"E major", tonic:"E", mode:"major"},
+    {name:"B major", tonic:"B", mode:"major"},
+    {name:"F-sharp major", tonic:"F#", mode:"major"},
+    {name:"C-sharp major", tonic:"C#", mode:"major"},
+    {name:"F major", tonic:"F", mode:"major"},
+    {name:"B-flat major", tonic:"Bb", mode:"major"},
+    {name:"E-flat major", tonic:"Eb", mode:"major"},
+    {name:"A-flat major", tonic:"Ab", mode:"major"},
+    {name:"D-flat major", tonic:"Db", mode:"major"},
+    {name:"G-flat major", tonic:"Gb", mode:"major"},
+    {name:"C-flat major", tonic:"Cb", mode:"major"},
+    {name:"A minor", tonic:"A", mode:"minor"},
+    {name:"E minor", tonic:"E", mode:"minor"},
+    {name:"B minor", tonic:"B", mode:"minor"},
+    {name:"F-sharp minor", tonic:"F#", mode:"minor"},
+    {name:"C-sharp minor", tonic:"C#", mode:"minor"},
+    {name:"G-sharp minor", tonic:"G#", mode:"minor"},
+    {name:"D-sharp minor", tonic:"D#", mode:"minor"},
+    {name:"A-sharp minor", tonic:"A#", mode:"minor"},
+    {name:"D minor", tonic:"D", mode:"minor"},
+    {name:"G minor", tonic:"G", mode:"minor"},
+    {name:"C minor", tonic:"C", mode:"minor"},
+    {name:"F minor", tonic:"F", mode:"minor"},
+    {name:"B-flat minor", tonic:"Bb", mode:"minor"},
+    {name:"E-flat minor", tonic:"Eb", mode:"minor"},
+    {name:"A-flat minor", tonic:"Ab", mode:"minor"}
+  ];
+  const letters = ["C","D","E","F","G","A","B"];
+  const naturalPitch = {C:0,D:2,E:4,F:5,G:7,A:9,B:11};
+  const intervals = {major:[0,2,4,5,7,9,11], minor:[0,2,3,5,7,8,10]};
+  const degreeNames = ["Tonic","Supertonic","Mediant","Subdominant","Dominant","Submediant","Subtonic","Leading Tone"];
+  const promptEl = document.getElementById("prompt");
+  const promptLabel = document.getElementById("prompt-label");
+  const input = document.getElementById("answer");
+  const feedback = document.getElementById("feedback");
+  const voiceover = document.getElementById("voiceover");
+  const form = document.getElementById("answer-form");
+  const submitButton = form.querySelector('button[type="submit"]');
+  const nextButton = document.getElementById("next");
+  const resetButton = document.getElementById("reset");
+  const correctEl = document.getElementById("correct");
+  const attemptedEl = document.getElementById("attempted");
+  const degreeButtons = document.getElementById("degree-buttons");
+  let current = null, correct = 0, attempted = 0, answered = false;
+  let screen = "welcome", lastPromptKey = "", advanceTimer = null;
+  let speechQueue = [];
+  let speaking = false;
+
+  function speak(text, onComplete = null) {
+    if (!voiceover.checked || !("speechSynthesis" in window)) {
+      if (onComplete) onComplete();
+      return;
+    }
+    // Queue speech rather than cancelling it, so corrective feedback can finish.
+    speechQueue.push({text, onComplete});
+    if (!speaking) speakNext();
+  }
+  function speakNext() {
+    if (!voiceover.checked || !("speechSynthesis" in window)) {
+      speechQueue = [];
+      speaking = false;
+      return;
+    }
+    if (!speechQueue.length) {
+      speaking = false;
+      return;
+    }
+    speaking = true;
+    const item = speechQueue.shift();
+    const utterance = new SpeechSynthesisUtterance(item.text);
+    utterance.rate = 0.88;
+    utterance.lang = document.documentElement.lang || "en-US";
+    utterance.onend = () => {
+      if (item.onComplete) item.onComplete();
+      speakNext();
+    };
+    utterance.onerror = () => {
+      if (item.onComplete) item.onComplete();
+      speakNext();
+    };
+    window.speechSynthesis.speak(utterance);
+  }
+  voiceover.addEventListener("change", () => {
+    if (!voiceover.checked && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+      speechQueue = [];
+      speaking = false;
+    } else if (voiceover.checked) {
+      speak(screen === "welcome"
+        ? ""
+        : screen === "instructions"
+        ? "Identify the scale degree of the note shown in the given key and mode. Type the answer or choose a scale-degree button. Press I to repeat the instructions. Otherwise, press Enter to begin."
+        : promptEl.textContent);
+    }
+  });
+
+  function pitchClass(note) {
+    const m = note.match(/^([A-G])([#b]*)$/);
+    if (!m) return null;
+    let p = naturalPitch[m[1]];
+    for (const a of m[2]) p += a === "#" ? 1 : -1;
+    return ((p % 12) + 12) % 12;
+  }
+  function parseTonic(tonic) { return tonic.match(/^([A-G])([#b]?)$/); }
+  function spellDegree(key, index, semitones) {
+    const tonicMatch = parseTonic(key.tonic);
+    const start = letters.indexOf(tonicMatch[1]);
+    const letter = letters[(start + index) % 7];
+    const targetPitch = (pitchClass(key.tonic) + semitones) % 12;
+    const base = naturalPitch[letter];
+    let diff = ((targetPitch - base + 6 + 12) % 12) - 6;
+    if (diff > 0) return letter + "#".repeat(diff);
+    if (diff < 0) return letter + "b".repeat(-diff);
+    return letter;
+  }
+  function getAnswer(key, degreeIndex) {
+    const scale = intervals[key.mode];
+    let semitones;
+    if (degreeIndex === 7 || (degreeIndex === 6 && key.mode === "major")) semitones = 11;
+    else if (degreeIndex === 6) semitones = 10;
+    else semitones = scale[degreeIndex];
+    return spellDegree(key, degreeIndex === 7 ? 6 : degreeIndex, semitones);
+  }
+  function normalize(value) {
+    return value.toLowerCase()
+      .replace(/[♯＃]/g, "#").replace(/[♭]/g, "b")
+      .replace(/-/g, " ").replace(/\s+/g, "")
+      .replace(/sharp/g, "#").replace(/flat/g, "b").replace(/natural/g, "");
+  }
+  function pretty(note) { return note.replace(/#/g, " sharp").replace(/b/g, " flat"); }
+
+  function showWelcome() {
+    screen = "welcome";
+    promptLabel.textContent = "";
+    promptLabel.hidden = true;
+    promptEl.textContent = "press i for instructions, otherwise press enter to begin";
+    form.hidden = true;
+    feedback.textContent = "";
+    // The welcome announcement is intentionally triggered by the student's first Enter press.
+  }
+  function showInstructions() {
+    screen = "instructions";
+    promptLabel.hidden = false;
+    promptLabel.textContent = "Instructions";
+    promptEl.textContent = "Identify the scale degree of the note shown in the given key and mode. Type the answer or choose a scale-degree button. Press I to repeat the instructions. Otherwise, press Enter to begin.";
+    form.hidden = true;
+    feedback.textContent = "";
+    speak(promptEl.textContent);
+  }
+  function startQuiz() {
+    screen = "quiz";
+    promptLabel.hidden = false;
+    form.hidden = false;
+    nextButton.textContent = "Next prompt";
+    newPrompt();
+  }
+  function newPrompt() {
+    if (advanceTimer) { clearTimeout(advanceTimer); advanceTimer = null; }
+    const choices = [];
+    for (const key of keys) {
+      for (let i=0;i<7;i++) {
+        const degree = i === 6
+          ? (key.mode === "major" ? "Leading Tone" : "Subtonic")
+          : degreeNames[i];
+        choices.push({key, degreeIndex:i, degree, note:getAnswer(key,i)});
+      }
+    }
+    let next;
+    do { next = choices[Math.floor(Math.random()*choices.length)]; }
+    while (choices.length > 1 && `${next.key.name}|${next.note}` === lastPromptKey);
+    lastPromptKey = `${next.key.name}|${next.note}`;
+    current = next; answered = false;
+    promptLabel.textContent = "Identify the scale degree:";
+    promptEl.textContent = `${pretty(next.note)} in ${next.key.name}`;
+    input.value = "";
+    input.disabled = false;
+    submitButton.disabled = false;
+    feedback.textContent = "";
+    feedback.className = "";
+    degreeButtons.replaceChildren();
+    degreeNames.forEach(name => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = name;
+      button.addEventListener("click", () => checkAnswer(name));
+      degreeButtons.appendChild(button);
+    });
+    speak(promptEl.textContent);
+    input.focus();
+  }
+
+  function normalizeDegree(value) {
+    return value.toLowerCase().trim().replace(/\s+/g, " ").replace(/-/g, " ");
+  }
+
+  function checkAnswer(value) {
+    if (screen !== "quiz" || answered || !current) return;
+    const entered = normalizeDegree(value);
+    const expected = normalizeDegree(current.degree);
+    attempted++;
+    if (entered === expected) {
+      correct++;
+      feedback.textContent = "Correct!";
+      feedback.className = "good";
+    } else {
+      feedback.textContent = `Not quite. The answer is ${current.degree}.`;
+      feedback.className = "bad";
+    }
+    answered = true;
+    input.disabled = true;
+    submitButton.disabled = true;
+    degreeButtons.querySelectorAll("button").forEach(button => button.disabled = true);
+    correctEl.textContent = correct;
+    attemptedEl.textContent = attempted;
+    if (feedback.classList.contains("bad") && voiceover.checked) {
+      speak(feedback.textContent, () => {
+        if (advanceTimer) { clearTimeout(advanceTimer); advanceTimer = null; }
+        if (screen === "quiz" && answered) newPrompt();
+      });
+    } else {
+      speak(feedback.textContent);
+      advanceTimer = window.setTimeout(newPrompt, 1600);
+    }
+  }
+
+  form.addEventListener("submit", e => {
+    e.preventDefault();
+    if (screen === "welcome" || screen === "instructions") {
+      startQuiz();
+      return;
+    }
+    if (screen !== "quiz" || answered || !current) return;
+    checkAnswer(input.value);
+  });
+  nextButton.addEventListener("click", () => {
+    if (screen === "quiz") newPrompt();
+  });
+  resetButton.addEventListener("click", () => {
+    correct = 0; attempted = 0;
+    correctEl.textContent = "0"; attemptedEl.textContent = "0";
+    if (screen !== "quiz") startQuiz();
+    else newPrompt();
+  });
+  document.addEventListener("keydown", e => {
+    if (e.altKey || e.ctrlKey || e.metaKey) return;
+    if (screen === "welcome" || screen === "instructions" || screen === "welcome-announced") {
+      if (e.key.toLowerCase() === "i") {
+        e.preventDefault();
+        showInstructions();
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        if (screen === "welcome") {
+          // First Enter: announce the welcome prompt. Second Enter begins the quiz.
+          speak("press i for instructions, otherwise press enter to begin.");
+          screen = "welcome-announced";
+        } else {
+          startQuiz();
+        }
+      }
+    }
+  });
+  showWelcome();
+
+})();
+</script>
+</body>
+</html>
